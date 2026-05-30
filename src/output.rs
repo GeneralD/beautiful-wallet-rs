@@ -12,8 +12,10 @@ use std::io::Write;
 use std::path::Path;
 use std::sync::Mutex;
 
-/// A matched wallet, serialized with the original camelCase column names.
+/// A matched wallet, serialized with the original camelCase column names
+/// (`mnemonicPhrase`, `privateKey`, `bitcoinAddress`, `ethereumAddress`).
 #[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Record<'a> {
     pub mnemonic_phrase: &'a str,
     pub private_key: &'a str,
@@ -49,6 +51,30 @@ impl NdjsonSink {
             .lock()
             .map_err(|_| anyhow::anyhow!("sink poisoned"))?;
         file.write_all(line.as_bytes()).context("write record")?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Locks the on-disk field names to the original `wallet.ts` CSV columns.
+    /// Without `rename_all = "camelCase"` serde emits the Rust snake_case
+    /// identifiers, silently breaking downstream tooling — this guards it.
+    #[test]
+    fn serializes_with_camelcase_columns() -> Result<()> {
+        let line = serde_json::to_string(&Record {
+            mnemonic_phrase: "m",
+            private_key: "k",
+            bitcoin_address: "1b",
+            ethereum_address: "0xe",
+            description: "d",
+        })?;
+        assert_eq!(
+            line,
+            r#"{"mnemonicPhrase":"m","privateKey":"k","bitcoinAddress":"1b","ethereumAddress":"0xe","description":"d"}"#
+        );
         Ok(())
     }
 }

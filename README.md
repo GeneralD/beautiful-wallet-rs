@@ -81,7 +81,8 @@ fluctuate with thermal throttling on a laptop.
 
 ## Patterns
 
-The full pattern set from the original is ported verbatim (38 patterns:
+The full pattern set from the original is ported verbatim (39 patterns,
+38 distinct descriptions — the two ascending-alphabet variants share a label:
 "only numbers", "starts with 7 sevens", "includes 8 zeros", "multiple of 3",
 ascending sequences, …). Patterns are matched against the **EIP-55 checksummed**
 address, preserving the original's per-pattern case sensitivity, and the first
