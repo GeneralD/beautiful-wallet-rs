@@ -1,0 +1,6 @@
+/target
+
+# Generated wallets contain private keys — never commit them.
+*.ndjson
+*.csv
+wallets.*
