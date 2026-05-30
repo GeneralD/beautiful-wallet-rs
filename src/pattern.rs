@@ -6,6 +6,12 @@
 //! with the JS `/i` flag get a `(?i)` prefix here; the three ascendant patterns
 //! were case-sensitive in the original and stay so (they are real EIP-55 constraints).
 //!
+//! Local additions beyond the original set: leading runs of 8+ identical *digits*
+//! (`^0x0{8}`…`^0x9{8}`) and the head-anchored digit sequences `123456789`,
+//! `0123456789`, `1234567890`. Hex-letter runs are intentionally excluded — EIP-55
+//! scrambles their case, so a letter-run renders messy while digit runs read clean.
+//! Each is declared *above* the shorter pattern it would otherwise be shadowed by.
+//!
 //! `matched()` returns the *first* matching pattern in declaration order, mirroring
 //! `Array.prototype.find`, so the reported description is order-deterministic.
 
@@ -56,6 +62,20 @@ impl PatternSet {
 const SPECS: &[(&str, bool, &str)] = &[
     (r"^0x\d{40}$",                true,  "only numbers"),
     (r"^0x[a-f]{40}$",             true,  "only alphabets"),
+    // Leading run of 8+ identical digits. Declared above the 7-run block so an
+    // 8-run reports "8 …" rather than being shadowed by "starts with 7 …".
+    // Digits only: hex letters carry EIP-55 checksum case noise (e.g. 0xaAAaAaaA),
+    // so a letter-run renders messy; digits have no case and read cleanly.
+    (r"^0x0{8}",                   false, "starts with 8 zeros"),
+    (r"^0x1{8}",                   false, "starts with 8 ones"),
+    (r"^0x2{8}",                   false, "starts with 8 twos"),
+    (r"^0x3{8}",                   false, "starts with 8 threes"),
+    (r"^0x4{8}",                   false, "starts with 8 fours"),
+    (r"^0x5{8}",                   false, "starts with 8 fives"),
+    (r"^0x6{8}",                   false, "starts with 8 sixes"),
+    (r"^0x7{8}",                   false, "starts with 8 sevens"),
+    (r"^0x8{8}",                   false, "starts with 8 eights"),
+    (r"^0x9{8}",                   false, "starts with 8 nines"),
     (r"^0x0{7}",                   true,  "starts with 7 zeros"),
     (r"^0x1{7}",                   true,  "starts with 7 ones"),
     (r"^0x2{7}",                   true,  "starts with 7 twos"),
@@ -74,6 +94,12 @@ const SPECS: &[(&str, bool, &str)] = &[
     (r"^0xf{7}",                   true,  "starts with 7 f"),
     (r"^0x0000[0-9a-f]{32}0000$",  true,  "lead and tail are 4 zeros"),
     (r"^0x[0369a-f]{40}$",         true,  "multiple of 3"),
+    // Head-anchored digit sequences. Longest-prefix-first so "1234567890" wins
+    // over its own prefix "123456789", and all three win over the shorter
+    // "^0x0123456" ascendant below. All digits → case is irrelevant.
+    (r"^0x0123456789",             false, "starts with 0123456789"),
+    (r"^0x1234567890",             false, "starts with 1234567890"),
+    (r"^0x123456789",              false, "starts with 123456789"),
     (r"^0x0123456",                false, "starts with number ascendant"),
     (r"^0xabcdef",                 false, "starts with alphabet ascendant"),
     (r"^0xABCDEF",                 false, "starts with alphabet ascendant"),
@@ -127,6 +153,49 @@ mod tests {
             set.matched("0xABCDEF0123456789012345678901234567890123")
                 .map(|p| p.description),
             Some("starts with alphabet ascendant"),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn leading_eight_run_outranks_seven_run() -> Result<()> {
+        let set = PatternSet::compiled()?;
+        // 8 leading zeros, with letters in the body so it is not "only numbers"
+        // and a non-zero tail so it is not "lead and tail are 4 zeros".
+        assert_eq!(
+            set.matched("0x00000000aBcDeF0123456789012345678901aBcD")
+                .map(|p| p.description),
+            Some("starts with 8 zeros"),
+        );
+        // Exactly 7 leading eights (8th differs) still reports the 7-run.
+        assert_eq!(
+            set.matched("0x8888888aBcDeF0123456789012345678901aBcDe")
+                .map(|p| p.description),
+            Some("starts with 7 eights"),
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn head_digit_sequences_win_longest_first() -> Result<()> {
+        let set = PatternSet::compiled()?;
+        // 1234567890 (10) must win over its own prefix 123456789 (9).
+        assert_eq!(
+            set.matched("0x1234567890aBcDeF0123456789012345678901aB")
+                .map(|p| p.description),
+            Some("starts with 1234567890"),
+        );
+        // 123456789 followed by a non-zero digit → the 9-digit sequence.
+        assert_eq!(
+            set.matched("0x123456789aBcDeF0123456789012345678901aBc")
+                .map(|p| p.description),
+            Some("starts with 123456789"),
+        );
+        // 0123456789 must win over the shorter "^0x0123456" ascendant.
+        assert_eq!(
+            set.matched("0x0123456789aBcDeF012345678901234567890aBc")
+                .map(|p| p.description),
+            Some("starts with 0123456789"),
         );
         Ok(())
     }

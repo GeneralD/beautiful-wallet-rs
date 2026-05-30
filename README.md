@@ -1,5 +1,7 @@
 # beautiful-wallet (Rust)
 
+![beautiful-wallet — a fast parallel Rust miner for vanity Ethereum/Bitcoin wallets](assets/hero.png)
+
 [![lang](https://img.shields.io/badge/lang-Rust-orange)](https://www.rust-lang.org/) [![port of](https://img.shields.io/badge/port%20of-GeneralD%2Fbeautiful--wallet-blue)](https://github.com/GeneralD/beautiful-wallet) [![chain](https://img.shields.io/badge/chain-Ethereum%20%2B%20Bitcoin-blue)](https://ethereum.org/) [![speedup](https://img.shields.io/badge/vs%20TS-~20x-green)](#benchmarks) [![license](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
 A fast, parallel **vanity BIP39 wallet miner** — a Rust port of the TypeScript
@@ -84,9 +86,17 @@ fluctuate with thermal throttling on a laptop.
 The full pattern set from the original is ported verbatim (39 patterns,
 38 distinct descriptions — the two ascending-alphabet variants share a label:
 "only numbers", "starts with 7 sevens", "includes 8 zeros", "multiple of 3",
-ascending sequences, …). Patterns are matched against the **EIP-55 checksummed**
-address, preserving the original's per-pattern case sensitivity, and the first
-match in declaration order names the hit.
+ascending sequences, …), plus a few **local additions** for rarer hits now that
+the search is fast: leading runs of 8+ identical digits (`starts with 8 zeros` …
+`8 nines`) and the head-anchored digit sequences `123456789`, `0123456789`,
+`1234567890`. Hex-letter runs are deliberately excluded — EIP-55 scrambles their
+case, so a letter-run renders messy (`0xaAAaAaaA…`) while digit runs read clean
+(`0x88888888…`). 52 patterns total.
+
+Patterns are matched against the **EIP-55 checksummed** address, preserving the
+original's per-pattern case sensitivity, and the first match in declaration order
+names the hit — so stricter patterns (an 8-run, a longer sequence) are declared
+above the shorter ones they would otherwise be shadowed by.
 
 ## Correctness
 
